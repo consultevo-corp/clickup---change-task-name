@@ -9,28 +9,24 @@ function doPost(e) {
     Logger.log(JSON.stringify(payload));
 
     // Open the target spreadsheet and sheet
-    var ss = SpreadsheetApp.openById('YOUR_SPREADSHEET_ID'); // Replace with your spreadsheet ID
-    var sheet = ss.getSheetByName('Sheet3'); // Replace with your sheet name
+    var ss = SpreadsheetApp.openById('[spreadsheet ID]'); // enter spreadsheet ID
+    var sheet = ss.getSheetByName('Sheet Name'); // enter sheet name
 
     // Check and add headers if they don't exist
     if (sheet.getLastRow() === 0) {
-      sheet.appendRow(['Name', 'Assignee', 'Due date', 'Priority', 'Status', 'Assignee Name', 'Issue ID', 'Log Details']);
+      sheet.appendRow(['Task ID', 'First Name', 'Last Name']);
     }
 
     // Extract relevant fields from the payload
-    var name = payload.payload.name;
-    var assignee = payload.payload.assignees.length > 0 ? payload.payload.assignees[0].username : '';
-    var dueDate = payload.payload.due_date ? new Date(payload.payload.due_date).toLocaleDateString() : '';
-    var priority = payload.payload.priority ? payload.payload.priority.priority : '';
-    var status = payload.payload.status ? payload.payload.status.status : '';
-    var assigneeName = getCustomFieldValue(payload, 'Assignee Name');
-    var issueId = getCustomFieldValue(payload, 'Issue ID');
+    var taskId = payload.payload.id;
+    var firstName = payload.payload.custom_fields.find(field => field.name === 'First Name')?.value || '';
+    var lastName = payload.payload.custom_fields.find(field => field.name === 'Last Name')?.value || '';
 
     // Append the extracted fields as a new row
-    sheet.appendRow([name, assignee, dueDate, priority, status, assigneeName, issueId, logDetails]);
+    sheet.appendRow([taskId, firstName, lastName]);
 
-    // Update the task in ClickUp
-    updateTask(payload.payload.id, assigneeName, issueId);
+    // Update the task name in ClickUp
+    updateTask(taskId, firstName, lastName);
 
     // Return a response to the webhook
     return ContentService.createTextOutput('Success');
@@ -42,39 +38,14 @@ function doPost(e) {
   }
 }
 
-// Helper function to get the value of a custom field by name
-function getCustomFieldValue(payload, fieldName) {
+// Function to update the task name in ClickUp
+function updateTask(taskId, firstName, lastName) {
   try {
-    var customFields = payload.payload.custom_fields;
-    for (var i = 0; i < customFields.length; i++) {
-      if (customFields[i].name === fieldName) {
-        return customFields[i].value;
-      }
-    }
-    return null;
-  } catch (error) {
-    var logDetails = 'Error in getCustomFieldValue: ' + error.toString();
-    Logger.log(logDetails);
-    appendLogToSheet(logDetails); // Append log details to the sheet
-    return null;
-  }
-}
-
-// Function to update the task in ClickUp
-function updateTask(taskId, assigneeName, issueId) {
-  try {
-    var apiToken = 'YOUR_CLICKUP_API_TOKEN'; // Replace with your ClickUp API token
+    var apiToken = '[ClickUP API]'; // enter your CLickUP API
     var url = 'https://api.clickup.com/api/v2/task/' + taskId;
 
-    // Calculate the new due date (3 days from now)
-    var newDueDate = new Date();
-    newDueDate.setDate(newDueDate.getDate() + 3);
-    var newDueDateMillis = newDueDate.getTime(); // Convert to milliseconds
-
     var payload = {
-      'name': assigneeName + ' ' + issueId,
-      'status': 'In Review',
-      'due_date': newDueDateMillis
+      'name': `${firstName} ${lastName}`
     };
 
     var options = {
@@ -92,9 +63,6 @@ function updateTask(taskId, assigneeName, issueId) {
     if (response.getResponseCode() !== 200) {
       throw new Error('API response error: ' + response.getContentText());
     }
-
-    // Add the tag separately
-    addTagToTask(taskId, 'Webhooked');
   } catch (error) {
     var logDetails = 'Error in updateTask: ' + error.toString();
     Logger.log(logDetails);
@@ -102,36 +70,10 @@ function updateTask(taskId, assigneeName, issueId) {
   }
 }
 
-// Function to add a tag to the task in ClickUp
-function addTagToTask(taskId, tagName) {
-  try {
-    var apiToken = 'YOUR_CLICKUP_API_TOKEN'; // Replace with your ClickUp API token
-    var url = 'https://api.clickup.com/api/v2/task/' + taskId + '/tag/' + tagName;
-
-    var options = {
-      'method': 'post',
-      'headers': {
-        'Authorization': apiToken
-      },
-      'muteHttpExceptions': true
-    };
-
-    var response = UrlFetchApp.fetch(url, options);
-    Logger.log('Add tag response: ' + response.getContentText());
-    if (response.getResponseCode() !== 200) {
-      throw new Error('API response error: ' + response.getContentText());
-    }
-  } catch (error) {
-    var logDetails = 'Error in addTagToTask: ' + error.toString();
-    Logger.log(logDetails);
-    appendLogToSheet(logDetails); // Append log details to the sheet
-  }
-}
-
-// Function to append log details to the last row in Column H
+// Function to append log details to the last row in Column D
 function appendLogToSheet(logDetails) {
-  var ss = SpreadsheetApp.openById('YOUR_SPREADSHEET_ID'); // Replace with your spreadsheet ID
-  var sheet = ss.getSheetByName('Sheet3'); // Replace with your sheet name
+  var ss = SpreadsheetApp.openById('[spreadsheet ID]'); // enter spreadsheet ID
+  var sheet = ss.getSheetByName('Sheet Name'); // enter sheet name
   var lastRow = sheet.getLastRow();
-  sheet.getRange(lastRow, 8).setValue(logDetails); // Column H is the 8th column
+  sheet.getRange(lastRow, 4).setValue(logDetails); // Column D is the 4th column
 }
